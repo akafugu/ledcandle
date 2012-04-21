@@ -67,6 +67,9 @@ volatile uint16_t off_timer = ON_2H;
 volatile uint16_t button_held_counter; // how long has button been held?
 volatile bool off_flag = false; // has the button been held long enough to turn off?
 
+// for flickering intensity
+volatile bool fast_flicker = true;
+
 void led_off(void)
 {
 	PORTB = 0xff;
@@ -161,11 +164,17 @@ void flicker(void)
 				cbi(PORTB, PB2);
 			}
 			
-			if (temp & (1<<2)) { // off
-				cbi(DDRB, PB3);
-				sbi(PORTB, PB3);
+			if (fast_flicker) {
+				if (temp & (1<<2)) { // off
+					cbi(DDRB, PB3);
+					sbi(PORTB, PB3);
+				}
+				else { // on
+					sbi(DDRB, PB3);
+					cbi(PORTB, PB3);
+				}
 			}
-			else { // on
+			else {
 				sbi(DDRB, PB3);
 				cbi(PORTB, PB3);
 			}
@@ -194,6 +203,10 @@ ISR(TIM0_OVF_vect)
 	}
 	
 	if (BUTTON_PIN & _BV(BUTTON_BIT)) { // button is not held
+		if (button_held_counter > 0) { // button up detected
+			fast_flicker = !fast_flicker; 
+		}
+
 		button_held = false;
 		button_held_counter = 0;
 	}
