@@ -42,6 +42,8 @@
  *
  */
 
+#define DEBUG
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
@@ -56,7 +58,7 @@ volatile bool button_held = false;
 
 // defines for on time (in seconds)
 #define ON_1H 3600
-#define ON_2H 7200
+#define ON_2H 15
 #define ON_3H 10800
 #define ON_4H 14400
 #define ON_5h 18000
@@ -88,74 +90,84 @@ void set_brightness(uint8_t value)
 	brightness = value;
 }
 
+volatile uint8_t sleep_requested = 0;
+
 // Enter sleep mode: Wake on INT0 interrupt
 void do_sleep(void)
 {
-	set_brightness(0);
-
-	GIMSK |= (1 << PCIE);	// Pin change interrupt enabled
-	PCMSK |= 1 << PCINT0;
-
+	cli();
+	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
+	#ifdef DEBUG
+	PCMSK |= _BV(PCINT2);	// PB2 
+	#else
+	PCMSK |= _BV(PCINT0);	// PB0
+	#endif
+	sleep_requested = 0;
+	PORTB &= ~_BV(PB0);
 	set_sleep_mode(_BV(SM1));	// Power down sleep mode (sets MCUCR)
+	sei();
 	sleep_mode();
-
 	off_timer = ON_2H;
 }
 
-// Interrupt signal PCINT0: On PB0
+// Interrupt signal PCINT0: On PB0 (PB2 for DEBUG, different board)
 ISR(PCINT0_vect)
 {
-	// disable pin-change interrupt, so switch-bounce doesn't kill us
-	GIMSK &= ~_BV(PCIE);
+	PCMSK = 0;
+	GIFR |= _BV(PCIF); // clear PCIF
 }
 
 // Flicker by randomly setting pins PB1~PB4 on and off
 void flicker(void)
 {
 	uint32_t r;
-	uint8_t temp;
+	uint8_t temp1;
+	uint8_t temp2;
 
 	r = rand();
+	temp1 = (uint8_t) (r >> 28);
 
 	if (off_flag) {
 		set_brightness(0);
 	} else {
-		temp = (uint8_t) r;	// use lowermost 8 bits to set values for the LED pins
-		set_brightness(temp);
+		temp2 = (uint8_t) r;	// use lowermost 8 bits to set values for the LED pins
+		set_brightness(0);
+		_delay_loop_2(temp1 << 7);
+		set_brightness(temp2);
+		_delay_loop_2(temp1 << 7);
 	}
-
-	// Use top byte to control delay between each intensity change
-	// Tweaking these numbers will affect the speed of the flickering
-	temp = (uint8_t) (r >> 24);
-	_delay_loop_2(temp << 7);
 }
 
 ISR(TIM0_COMPA_vect)
 {
-	static uint16_t bitmask = 0x0001;
+	static uint16_t bitmask = 0b0000000000000001;
 	static uint16_t sec_counter = 0;
 	static uint16_t PWM_cycle_counter = 0;
 	static uint16_t button_held_counter = 0;
 	uint8_t OCR0A_next;
 
-	// save TIMER0 prescaler
-	uint8_t TCCR0B__saved = TCCR0B;
-	// stop TIMER0
-	TCCR0B = 0;
 	// increase system-clock
 	CLKPR = _BV(CLKPCE);
 	CLKPR = 0;		// set system-clock prescaler to 1 --> full 9.6MHz
 
-	if (brightness & bitmask) {
-		PORTB |= 0b00011110;	// PB1...PB4
+	if ( brightness & bitmask ) {
+		#ifdef DEBUG
+			PORTB |= (0b00000001); // PB0
+		#else
+			PORTB |= 0b00011110;	// PB1...PB4
+		#endif
 	} else {
-		PORTB &= ~(0b00011110);	// PB1...PB4
+		#ifdef DEBUG
+			PORTB &= ~(0b00000001); // PB0
+		#else
+			PORTB &= ~(0b00011110);	// PB1...PB4
+		#endif
 	}
 
 	OCR0A_next = bitmask;
 	bitmask = bitmask << 1;
 
-	if (bitmask == 9) {
+	if (bitmask == _BV(9)) {
 		bitmask = 0x0001;
 		OCR0A_next = 2;
 		PWM_cycle_counter++;
@@ -170,7 +182,11 @@ ISR(TIM0_COMPA_vect)
 		PWM_cycle_counter = 0;
 	}
 
+	#ifdef DEBUG
+	if (PINB & _BV(PB2)) { 
+	#else
 	if (PINB & _BV(PB0)) {	// button is not held
+	#endif
 		if (button_held_counter > 0) {	// button up detected
 			fast_flicker = !fast_flicker;
 		}
@@ -187,22 +203,23 @@ ISR(TIM0_COMPA_vect)
 		sec_counter = 0;
 		off_flag = false;
 		button_held_counter = 0;
-		do_sleep();
+		sleep_requested = 1;
+		return;
 	}
 	// holding the button for 3 seconds turns the device off
-	if (button_held_counter == 879) {
+	if (button_held_counter == 7032) {
 		off_flag = true;
+		return;
 	}
 	// when off flag is set, wait for key up to go to sleep (otherwise the interrupt pin will wake the device up again)
 	if (off_flag && !button_held) {
 		off_flag = false;
-		do_sleep();
+		sleep_requested = 1;
 	}
+	
 	// decrease system-clock
 	CLKPR = _BV(CLKPCE);
 	CLKPR = _BV(CLKPS2);	// set system-clock prescaler to 1/16 --> 9.6MHz / 16 = 600kHz
-	// restore TIMER0 prescaler
-	TCCR0B = TCCR0B__saved;
 }
 
 void main(void) __attribute__ ((noreturn));
@@ -216,22 +233,33 @@ void main(void)
 
 	// configure TIMER0
 	TCCR0A = _BV(WGM01);	// set CTC mode
-	TCCR0B = _BV(CS01);	// set prescaler to 8
+	TCCR0B = ( _BV(CS01) );	// set prescaler to 8
 	// enable COMPA isr
 	TIMSK0 = _BV(OCIE0A);
 	// set top value for TCNT0
 	OCR0A = 10;		// just some start value
 
-	// pull-up on PB0
-	PORTB |= _BV(PB0);
-	// PB0 as input, PB1...PB4 as output
-	DDRB = 0b00011110;
+	#ifdef DEBUG
+		// pull-up on PB2
+		PORTB |= _BV(PB2);
+		// PB0 as output, rest as input
+		DDRB = 0b00000001;
+		PORTB |= _BV(PB0);
+	#else
+		// pull-up on PB0
+		PORTB |= _BV(PB0);
+		// PB0 as input, PB1...PB4 as output
+		DDRB = 0b00011110;
+	#endif
 
 	// globally enable interrupts
 	// necessary to wake up from sleep via pin-change interrupt
 	sei();
 
 	while (1) {
+		if(sleep_requested == 1) {
+			do_sleep();
+		}
 		flicker();
 	}
 }

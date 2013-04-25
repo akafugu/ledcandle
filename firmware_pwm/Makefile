@@ -11,7 +11,7 @@
 # PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 # Define your programmer in this file: ~/user.mk
--include ~/user.mk
+-include ./user.mk
 
 SILENT ?= @
 CROSS ?= avr-
@@ -131,7 +131,7 @@ endif
 # Brown-out detection at 2.7V
 # (for 4.3V brown-put detection, change hfuse to hfuse:w:0xf9:m
 # 9.6MHz internal
-AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x6A:m -U hfuse:w:0xFB:m
+AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x7A:m -U hfuse:w:0xFB:m
 
 # 4.6MHz internal / 8 = 575kHz
 #AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x69:m -U hfuse:w:0xfb:m
