@@ -49,6 +49,7 @@
 #include <avr/sleep.h>
 #include <util/delay.h>
 #include <stdbool.h>
+#include "main.h"
 
 #define sbi(var, mask)   ((var) |= (uint8_t)(1 << mask))
 #define cbi(var, mask)   ((var) &= (uint8_t)~(1 << mask))
@@ -75,6 +76,51 @@ volatile bool fast_flicker = true;
 // random number seed (will give same flicker sequence each time)
 uint32_t lfsr = 0xbeefcace;
 
+uint8_t brightness = 0;
+volatile uint8_t sleep_requested = 0;
+
+int main(void)
+{
+	// set system-clock prescaler to 1/16
+	// 9.6MHz RC-oscillator --> 600kHz system-clock
+	CLKPR = _BV(CLKPCE);
+	CLKPR = _BV(CLKPS2);
+
+	// configure TIMER0
+	TCCR0A = _BV(WGM01);	// set CTC mode
+	TCCR0B = ( _BV(CS01) );	// set prescaler to 8
+	// enable COMPA isr
+	TIMSK0 = _BV(OCIE0A);
+	// set top value for TCNT0
+	OCR0A = 10;		// just some start value
+
+	#ifdef DEBUG
+		// pull-up on PB2
+		PORTB |= _BV(PB2);
+		// PB0 as output, rest as input
+		DDRB = 0b00000001;
+		PORTB |= _BV(PB0);
+	#else
+		// pull-up on PB0
+		PORTB |= _BV(PB0);
+		// PB0 as input, PB1...PB4 as output
+		DDRB = 0b00011110;
+	#endif
+
+	// globally enable interrupts
+	// necessary to wake up from sleep via pin-change interrupt
+	sei();
+
+	fade_in();
+
+	while (1) {
+		if(sleep_requested == 1) {
+			do_sleep();
+		}
+		flicker();
+	}
+}
+
 uint32_t rand(void)
 {
 	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
@@ -83,14 +129,10 @@ uint32_t rand(void)
 	return lfsr;
 }
 
-uint8_t brightness = 0;
-
 void set_brightness(uint8_t value)
 {
 	brightness = value;
 }
-
-volatile uint8_t sleep_requested = 0;
 
 // Enter sleep mode: Wake on INT0 interrupt
 void do_sleep(void)
@@ -108,6 +150,7 @@ void do_sleep(void)
 	sei();
 	sleep_mode();
 	off_timer = ON_2H;
+	fade_in();
 }
 
 // Interrupt signal PCINT0: On PB0 (PB2 for DEBUG, different board)
@@ -222,44 +265,17 @@ ISR(TIM0_COMPA_vect)
 	CLKPR = _BV(CLKPS2);	// set system-clock prescaler to 1/16 --> 9.6MHz / 16 = 600kHz
 }
 
-void main(void) __attribute__ ((noreturn));
+void delay(uint16_t ms) {
+	while(ms) {
+		_delay_ms(1);
+		ms--;
+	}
+}
 
-void main(void)
-{
-	// set system-clock prescaler to 1/16
-	// 9.6MHz RC-oscillator --> 600kHz system-clock
-	CLKPR = _BV(CLKPCE);
-	CLKPR = _BV(CLKPS2);
-
-	// configure TIMER0
-	TCCR0A = _BV(WGM01);	// set CTC mode
-	TCCR0B = ( _BV(CS01) );	// set prescaler to 8
-	// enable COMPA isr
-	TIMSK0 = _BV(OCIE0A);
-	// set top value for TCNT0
-	OCR0A = 10;		// just some start value
-
-	#ifdef DEBUG
-		// pull-up on PB2
-		PORTB |= _BV(PB2);
-		// PB0 as output, rest as input
-		DDRB = 0b00000001;
-		PORTB |= _BV(PB0);
-	#else
-		// pull-up on PB0
-		PORTB |= _BV(PB0);
-		// PB0 as input, PB1...PB4 as output
-		DDRB = 0b00011110;
-	#endif
-
-	// globally enable interrupts
-	// necessary to wake up from sleep via pin-change interrupt
-	sei();
-
-	while (1) {
-		if(sleep_requested == 1) {
-			do_sleep();
-		}
-		flicker();
+void fade_in(void) {
+	uint8_t counter1;
+	for(counter1 = 0; counter1 <= 254; counter1++) {
+		set_brightness(counter1);
+		delay(5);
 	}
 }
