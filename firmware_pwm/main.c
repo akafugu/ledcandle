@@ -88,9 +88,6 @@
 // how long to stay on
 uint16_t off_timer = ON_2H;
 
-// for flickering intensity
-volatile bool fast_flicker = true;
-
 // random number seed (will give same flicker sequence each time)
 uint32_t lfsr = 0xbeefcace;
 
@@ -134,7 +131,7 @@ int main(void)
 uint32_t rand(void)
 {
 	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
-	// Galois LFSR: taps: 32 31 29 1; characteristic polynomial: x^32 + x^31 + x^29 + x + 1 */
+	// Galois LFSR: taps: 32 31 29 1; characteristic polynomial: x^32 + x^31 + x^29 + x + 1 
 	lfsr = (lfsr >> 1) ^ (-(lfsr & 1u) & 0xD0000001u);
 	return lfsr;
 }
@@ -148,20 +145,18 @@ void set_brightness(uint8_t value)
 void do_sleep(void)
 {
 	cli();
-	GIFR &= ~_BV(PCIF);
 	sleep_requested = 0;
 
 	// now we want to make sure the button is not pressed and is stable (not bouncing)
 	// switch bouncing is an unwanted wake-up source
 
-	uint8_t run = 1;
+	PORT_OUT_REG |= LED_MASK;
 
-	while( run ) { // while button is pressed
-		delay(20);
-		if( PORT_IN_REG & _BV(BUTTON_PIN) ) {
-			run = 0;
-		}
+	while( !(PORT_IN_REG & _BV(BUTTON_PIN)) ) { // while button is pressed (LOW)
+		delay(500);
 	}
+
+	GIFR &= ~_BV(PCIF);
 
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	sleep_enable();
@@ -170,7 +165,7 @@ void do_sleep(void)
 	PCMSK = PINC_MASK;
 
 	sei();
-	//fade_out();
+	fade_out();
 	sleep_cpu();
 	sleep_disable();
 	fade_in();	// wake up here again
@@ -186,12 +181,15 @@ ISR(PCINT0_vect)
 // Flicker by randomly setting pins PB1~PB4 on and off
 void flicker(void)
 {
-	uint32_t r;
 	uint8_t flicker_delay;
 	uint8_t flicker_brightness;
 
+	uint32_t r;
+
 	r = rand();
-	flicker_delay = (uint8_t)(r >> 28);
+
+	flicker_delay = (uint8_t)(r >> 24);
+
 	flicker_brightness = (uint8_t)(r); // user lowermost 8 bits to set values for the LED brightness
 
 	set_brightness(0);
@@ -237,9 +235,6 @@ ISR(TIM0_COMPA_vect)
 	}
 
 	if (PORT_IN_REG & _BV(BUTTON_PIN)) {	// button is not held
-		if (button_held_counter > 0) {	// button up detected
-			fast_flicker = !fast_flicker;
-		}
 		button_held_counter = 0;
 	} else {		// button is held
 		button_held_counter++;
@@ -248,11 +243,11 @@ ISR(TIM0_COMPA_vect)
 	// time to go to sleep?
 	if (off_timer != 0 && sec_counter >= off_timer) {
 		sec_counter = 0;
-		button_held_counter = 0;
 		sleep_requested = 1;
 	}
 	// holding the button for 3 seconds turns the device off
 	if (button_held_counter == 7032) {
+		sec_counter = 0;
 		sleep_requested = 1;
 	}
 

@@ -63,12 +63,12 @@ $(foreach i,$(VALUE_DEFS),$(eval $(call CHECK_VALUE_ANSWER,$(i))))
 
 OPT=s
 
-CFLAGS += -g -O$(OPT) \
--ffreestanding -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums \
+CFLAGS += -g -O$(OPT)\
+-fexpensive-optimizations -Wmain -Wall -g -gdwarf-2 -funsigned-bitfields -fpack-struct -fshort-enums -ffunction-sections -fdata-sections -fno-exceptions\
 -Wall -Wstrict-prototypes \
 -Wa,-adhlns=$(<:.c=.lst) -std=gnu99 -mmcu=$(MCU) 
 
-LDFLAGS = -Wl,-Map=$(TARGET).map,--cref
+LDFLAGS = -Wl,-Map=$(TARGET).map,--cref,--gc-sections,--print-gc-sections
 
 all: $(TARGET).elf size
 

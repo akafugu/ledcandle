@@ -1,7 +1,7 @@
 #ifndef main_h
 #define main_h
 
-int main(void) __attribute__ ((noreturn));
+int main(void); 
 void fade_in(void);
 void fade_out(void);
 void delay(uint16_t ms);
