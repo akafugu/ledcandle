@@ -96,6 +96,8 @@ volatile uint8_t sleep_requested = 0;
 
 int main(void)
 {
+	// Attiny13A fuse setting: -U lfuse:w:0x7A:m -U hfuse:w:0xFB:m
+	//
 	// set system-clock prescaler to 1/16
 	// 9.6MHz RC-oscillator --> 600kHz system-clock
 	CLKPR = _BV(CLKPCE);
@@ -192,9 +194,9 @@ void flicker(void)
 
 	flicker_brightness = (uint8_t)(r); // user lowermost 8 bits to set values for the LED brightness
 
-	fade(brightness,0,1); //set_brightness(0);
+	fade(brightness,0,1);
 	delay(flicker_delay);
-	fade(0,flicker_brightness,1); //set_brightness(flicker_brightness);
+	fade(0,flicker_brightness,1);
 	delay(flicker_delay);
 }
 
