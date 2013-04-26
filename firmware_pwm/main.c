@@ -54,9 +54,6 @@
 #define sbi(var, mask)   ((var) |= (uint8_t)(1 << mask))
 #define cbi(var, mask)   ((var) &= (uint8_t)~(1 << mask))
 
-// button control
-volatile bool button_held = false;
-
 // defines for on time (in seconds)
 #define ON_1H 3600
 #define ON_2H 15
@@ -99,7 +96,6 @@ int main(void)
 		PORTB |= _BV(PB2);
 		// PB0 as output, rest as input
 		DDRB = 0b00000001;
-		PORTB |= _BV(PB0);
 	#else
 		// pull-up on PB0
 		PORTB |= _BV(PB0);
@@ -141,11 +137,12 @@ void do_sleep(void)
 	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
 	#ifdef DEBUG
 	PCMSK |= _BV(PCINT2);	// PB2 
+	PORTB &= ~_BV(PB0);	// turn off PB0
 	#else
 	PCMSK |= _BV(PCINT0);	// PB0
+	PORTB &= ~0b00011110;	// turn off PB1...PB4
 	#endif
 	sleep_requested = 0;
-	PORTB &= ~_BV(PB0);
 	set_sleep_mode(_BV(SM1));	// Power down sleep mode (sets MCUCR)
 	sei();
 	sleep_mode();
@@ -234,32 +231,30 @@ ISR(TIM0_COMPA_vect)
 			fast_flicker = !fast_flicker;
 		}
 
-		button_held = false;
 		button_held_counter = 0;
 	} else {		// button is held
-		button_held = true;
 		button_held_counter++;
 	}
 
 	// time to go to sleep?
-	if (off_timer != 0 && sec_counter >= off_timer && !button_held) {
+	if (off_timer != 0 && sec_counter >= off_timer) {
 		sec_counter = 0;
 		off_flag = false;
 		button_held_counter = 0;
 		sleep_requested = 1;
-		return;
+		goto EXIT;
 	}
 	// holding the button for 3 seconds turns the device off
 	if (button_held_counter == 7032) {
 		off_flag = true;
-		return;
+		goto EXIT;
 	}
-	// when off flag is set, wait for key up to go to sleep (otherwise the interrupt pin will wake the device up again)
-	if (off_flag && !button_held) {
+	if (off_flag) {
 		off_flag = false;
 		sleep_requested = 1;
 	}
-	
+
+	EXIT:	
 	// decrease system-clock
 	CLKPR = _BV(CLKPCE);
 	CLKPR = _BV(CLKPS2);	// set system-clock prescaler to 1/16 --> 9.6MHz / 16 = 600kHz
