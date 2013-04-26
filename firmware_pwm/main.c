@@ -44,6 +44,30 @@
 
 #define DEBUG
 
+#ifdef DEBUG
+	#define PORT_DIR_REG DDRB
+	#define PORT_OUT_REG PORTB
+	#define PORT_IN_REG PINB
+	#define BUTTON_PIN PB2
+	// LED sits on PB0
+	#define LED_MASK 0b00000001
+	// PB0 as output, rest input
+	#define PORT_DIR_MASK 0b00000001
+	// pin-change mask
+	#define PINC_MASK 0b00000100
+#else
+	#define PORT_DIR_REG DDRB
+	#define PORT_OUT_REG PORTB
+	#define PORT_IN_REG PINB
+	#define BUTTON_PIN PB0
+	// LEDs sit on PB4...PB1
+	#define LED MASK 0b00011110
+	// PB4...PB1 as output, rest input
+	#define PORT_DIR_MASK 0b00011110
+	// pin-change mask
+	#define PINC_MASK 0b00000001
+#endif
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
@@ -91,18 +115,11 @@ int main(void)
 	// set top value for TCNT0
 	OCR0A = 10;		// just some start value
 
-	#ifdef DEBUG
-		// pull-up on PB2
-		PORTB |= _BV(PB2);
-		// PB0 as output, rest as input
-		DDRB = 0b00000001;
-	#else
-		// pull-up on PB0
-		PORTB |= _BV(PB0);
-		// PB0 as input, PB1...PB4 as output
-		DDRB = 0b00011110;
-	#endif
-
+	// pull-up on for BUTTON_PIN
+	PORT_OUT_REG |= _BV(BUTTON_PIN);
+	// set port directions
+	PORT_DIR_REG = PORT_DIR_MASK;
+	
 	// globally enable interrupts
 	// necessary to wake up from sleep via pin-change interrupt
 	sei();
@@ -135,13 +152,9 @@ void do_sleep(void)
 {
 	cli();
 	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
-	#ifdef DEBUG
-	PCMSK |= _BV(PCINT2);	// PB2 
-	PORTB &= ~_BV(PB0);	// turn off PB0
-	#else
-	PCMSK |= _BV(PCINT0);	// PB0
-	PORTB &= ~0b00011110;	// turn off PB1...PB4
-	#endif
+	PCMSK = PINC_MASK;
+	PORT_OUT_REG &= ~LED_MASK;
+
 	sleep_requested = 0;
 	set_sleep_mode(_BV(SM1));	// set Power-down as sleep mode (sets MCUCR)
 
@@ -151,15 +164,10 @@ void do_sleep(void)
 	// now we want to make sure the button is not pressed and is stable (not bouncing)
 	// switch bouncing is an unwanted wake-up source
 	BUTTON_CHECK:
-		#ifdef DEBUG
-		first = PINB & _BV(PB2);
-		delay(20); // should be enough anti-bouncing delay
-		second = PINB & _BV(PB2);
-		#else
-		first = PINB & _BV(PB0);
-		delay(20);
-		second = PINB & _BV(PB0);
-		#endif
+		first = ( PORT_IN_REG & _BV(BUTTON_PIN) );
+		delay(20); // should be neough anti-bounce delay
+		second = ( PORT_IN_REG & _BV(BUTTON_PIN) );
+	
 		if( (first + second) != 2 ) { // both measurements must read 1 (button released long enough)
 			goto BUTTON_CHECK;
 		} else {
@@ -212,17 +220,9 @@ ISR(TIM0_COMPA_vect)
 	CLKPR = 0;		// set system-clock prescaler to 1 --> full 9.6MHz
 
 	if ( brightness & bitmask ) {
-		#ifdef DEBUG
-			PORTB |= (0b00000001); // PB0
-		#else
-			PORTB |= 0b00011110;	// PB1...PB4
-		#endif
+		PORT_OUT_REG |= LED_MASK;
 	} else {
-		#ifdef DEBUG
-			PORTB &= ~(0b00000001); // PB0
-		#else
-			PORTB &= ~(0b00011110);	// PB1...PB4
-		#endif
+		PORT_OUT_REG &= ~LED_MASK;
 	}
 
 	OCR0A_next = bitmask;
@@ -243,11 +243,7 @@ ISR(TIM0_COMPA_vect)
 		PWM_cycle_counter = 0;
 	}
 
-	#ifdef DEBUG
-	if (PINB & _BV(PB2)) { 
-	#else
-	if (PINB & _BV(PB0)) {	// button is not held
-	#endif
+	if (PORT_IN_REG & _BV(BUTTON_PIN)) {	// button is not held
 		if (button_held_counter > 0) {	// button up detected
 			fast_flicker = !fast_flicker;
 		}
