@@ -174,9 +174,12 @@ void do_sleep(void)
 
 	GIFR &= ~_BV(PCIF);
 
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+	sleep_enable();
+
 	sei();
-    set_sleep_mode(_BV(SM1));	// set Power-down as sleep mode (sets MCUCR)
-	sleep_mode();	// now go to sleep
+	sleep_cpu();
+	sleep_disable();
 
 	while( 1 ) { // while button is pressed
 		delay(20);
