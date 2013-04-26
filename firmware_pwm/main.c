@@ -148,46 +148,31 @@ void set_brightness(uint8_t value)
 void do_sleep(void)
 {
 	cli();
-	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
-	PCMSK = PINC_MASK;
-
+	GIFR &= ~_BV(PCIF);
 	sleep_requested = 0;
 
 	// now we want to make sure the button is not pressed and is stable (not bouncing)
 	// switch bouncing is an unwanted wake-up source
 
-	set_brightness(0);
-	PORT_OUT_REG &= ~LED_MASK;
-
 	uint8_t run = 1;
 
 	while( run ) { // while button is pressed
 		delay(20);
-		PORT_OUT_REG &= ~LED_MASK;
-		delay(20);
-		PORT_OUT_REG |= LED_MASK;
 		if( PORT_IN_REG & _BV(BUTTON_PIN) ) {
 			run = 0;
 		}
-
 	}
-
-	GIFR &= ~_BV(PCIF);
 
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	sleep_enable();
 
+	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
+	PCMSK = PINC_MASK;
+
 	sei();
+	//fade_out();
 	sleep_cpu();
 	sleep_disable();
-
-	while( 1 ) { // while button is pressed
-		delay(20);
-		PORT_OUT_REG &= ~LED_MASK;
-		delay(20);
-		PORT_OUT_REG |= LED_MASK;
-	}
-
 	fade_in();	// wake up here again
 }
 
@@ -286,6 +271,14 @@ void delay(uint16_t ms) {
 void fade_in(void) {
 	uint8_t counter1;
 	for(counter1 = 0; counter1 <= 254; counter1++) {
+		set_brightness(counter1);
+		delay(5);
+	}
+}
+
+void fade_out(void) {
+	uint8_t counter1;
+	for(counter1 = 255; counter1 > 0; counter1--) {
 		set_brightness(counter1);
 		delay(5);
 	}

@@ -3,6 +3,7 @@
 
 int main(void) __attribute__ ((noreturn));
 void fade_in(void);
+void fade_out(void);
 void delay(uint16_t ms);
 void flicker(void);
 void do_sleep(void);
