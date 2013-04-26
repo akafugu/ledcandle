@@ -88,16 +88,13 @@
 // how long to stay on
 uint16_t off_timer = ON_2H;
 
-// for hold to turn off feature
-volatile bool off_flag = false;	// has the button been held long enough to turn off?
-
 // for flickering intensity
 volatile bool fast_flicker = true;
 
 // random number seed (will give same flicker sequence each time)
 uint32_t lfsr = 0xbeefcace;
 
-uint8_t brightness = 0;
+volatile uint8_t brightness = 0; // not changed in an ISR, but prevent optimizer to throw it out
 volatile uint8_t sleep_requested = 0;
 
 int main(void)
@@ -153,29 +150,41 @@ void do_sleep(void)
 	cli();
 	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
 	PCMSK = PINC_MASK;
-	PORT_OUT_REG &= ~LED_MASK;
 
 	sleep_requested = 0;
-	set_sleep_mode(_BV(SM1));	// set Power-down as sleep mode (sets MCUCR)
-
-	uint8_t first;
-	uint8_t second;
 
 	// now we want to make sure the button is not pressed and is stable (not bouncing)
 	// switch bouncing is an unwanted wake-up source
-	BUTTON_CHECK:
-		first = ( PORT_IN_REG & _BV(BUTTON_PIN) );
-		delay(20); // should be neough anti-bounce delay
-		second = ( PORT_IN_REG & _BV(BUTTON_PIN) );
-	
-		if( (first + second) != 2 ) { // both measurements must read 1 (button released long enough)
-			goto BUTTON_CHECK;
-		} else {
-			// proceed
+
+	set_brightness(0);
+	PORT_OUT_REG &= ~LED_MASK;
+
+	uint8_t run = 1;
+
+	while( run ) { // while button is pressed
+		delay(20);
+		PORT_OUT_REG &= ~LED_MASK;
+		delay(20);
+		PORT_OUT_REG |= LED_MASK;
+		if( PORT_IN_REG & _BV(BUTTON_PIN) ) {
+			run = 0;
 		}
 
+	}
+
+	GIFR &= ~_BV(PCIF);
+
 	sei();
+    set_sleep_mode(_BV(SM1));	// set Power-down as sleep mode (sets MCUCR)
 	sleep_mode();	// now go to sleep
+
+	while( 1 ) { // while button is pressed
+		delay(20);
+		PORT_OUT_REG &= ~LED_MASK;
+		delay(20);
+		PORT_OUT_REG |= LED_MASK;
+	}
+
 	fade_in();	// wake up here again
 }
 
@@ -197,14 +206,10 @@ void flicker(void)
 	flicker_delay = (uint8_t)(r >> 28);
 	flicker_brightness = (uint8_t)(r); // user lowermost 8 bits to set values for the LED brightness
 
-	if (off_flag) {
-		set_brightness(0);
-	} else {
-		set_brightness(0);
-		delay(flicker_delay);
-		set_brightness(flicker_brightness);
-		delay(flicker_delay);
-	}
+	set_brightness(0);
+	delay(flicker_delay);
+	set_brightness(flicker_brightness);
+	delay(flicker_delay);
 }
 
 ISR(TIM0_COMPA_vect)
@@ -255,22 +260,14 @@ ISR(TIM0_COMPA_vect)
 	// time to go to sleep?
 	if (off_timer != 0 && sec_counter >= off_timer) {
 		sec_counter = 0;
-		off_flag = false;
 		button_held_counter = 0;
 		sleep_requested = 1;
-		goto EXIT;
 	}
 	// holding the button for 3 seconds turns the device off
 	if (button_held_counter == 7032) {
-		off_flag = true;
-		goto EXIT;
-	}
-	if (off_flag) {
-		off_flag = false;
 		sleep_requested = 1;
 	}
 
-	EXIT:	
 	// decrease system-clock
 	CLKPR = _BV(CLKPCE);
 	CLKPR = _BV(CLKPS2);	// set system-clock prescaler to 1/16 --> 9.6MHz / 16 = 600kHz
