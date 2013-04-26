@@ -2,8 +2,7 @@
 #define main_h
 
 int main(void); 
-void fade_in(void);
-void fade_out(void);
+void fade(uint8_t from, uint8_t to);
 void delay(uint16_t ms);
 void flicker(void);
 void do_sleep(void);
