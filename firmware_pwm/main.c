@@ -118,7 +118,7 @@ int main(void)
 	// necessary to wake up from sleep via pin-change interrupt
 	sei();
 
-	fade(0,255);
+	fade(0,255,1);
 
 	while (1) {
 		if(sleep_requested == 1) {
@@ -165,10 +165,10 @@ void do_sleep(void)
 	PCMSK = PINC_MASK;
 
 	sei();
-	fade(255,0);
+	fade(255,0,1);
 	sleep_cpu();
 	sleep_disable();
-	fade(0,255);	// wake up here again
+	fade(0,255,1);	// wake up here again
 }
 
 // Interrupt signal PCINT0: On PB0 (PB2 for DEBUG, different board)
@@ -263,20 +263,20 @@ void delay(uint16_t ms) {
 	}
 }
 
-void fade(uint8_t from, uint8_t to) {
+void fade(uint8_t from, uint8_t to, uint8_t f_delay) {
 	uint8_t counter;
 
 	if(from <= to) {
 		for(counter = from; counter < to; counter++) {
 			set_brightness(counter);
-			delay(5);
+			delay(f_delay);
 		}
 	}
 
 	if(from > to) {
 		for(counter = from; counter > to; counter--) {
 			set_brightness(counter);
-			delay(5);
+			delay(f_delay);
 		}
 	}
 }
