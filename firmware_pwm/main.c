@@ -138,11 +138,6 @@ uint32_t rand(void)
 	return lfsr;
 }
 
-void set_brightness(uint8_t value)
-{
-	brightness = value;
-}
-
 // Enter sleep mode: Wake on INT0 interrupt
 void do_sleep(void)
 {
@@ -183,21 +178,12 @@ ISR(PCINT0_vect)
 // Flicker by randomly setting pins PB1~PB4 on and off
 void flicker(void)
 {
-	uint8_t flicker_delay;
-	uint8_t flicker_brightness;
+	uint8_t flicker_brightness = (uint8_t)(rand()); // user lowermost 8 bits to set values for the LED brightness
 
-	uint32_t r;
-
-	r = rand();
-
-	flicker_delay = (uint8_t)(r >> 24);
-
-	flicker_brightness = (uint8_t)(r); // user lowermost 8 bits to set values for the LED brightness
-
-	fade(brightness,0,1);
-	delay(flicker_delay);
-	fade(0,flicker_brightness,1);
-	delay(flicker_delay);
+	fade(brightness,16, (uint8_t)(rand() >> 30) );
+	delay( (uint8_t)(rand() >> 24) );
+	fade(16,flicker_brightness, (uint8_t)(rand() >> 30) );
+	delay( (uint8_t)(rand() >> 24) );
 }
 
 ISR(TIM0_COMPA_vect)
@@ -270,14 +256,14 @@ void fade(uint8_t from, uint8_t to, uint8_t f_delay) {
 
 	if(from <= to) {
 		for(counter = from; counter < to; counter++) {
-			set_brightness(counter);
+			brightness = counter;
 			delay(f_delay);
 		}
 	}
 
 	if(from > to) {
 		for(counter = from; counter > to; counter--) {
-			set_brightness(counter);
+			brightness = counter;
 			delay(f_delay);
 		}
 	}
