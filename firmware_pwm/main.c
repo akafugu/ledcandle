@@ -143,17 +143,38 @@ void do_sleep(void)
 	PORTB &= ~0b00011110;	// turn off PB1...PB4
 	#endif
 	sleep_requested = 0;
-	set_sleep_mode(_BV(SM1));	// Power down sleep mode (sets MCUCR)
+	set_sleep_mode(_BV(SM1));	// set Power-down as sleep mode (sets MCUCR)
+
+	uint8_t first;
+	uint8_t second;
+
+	// now we want to make sure the button is not pressed and is stable (not bouncing)
+	// switch bouncing is an unwanted wake-up source
+	BUTTON_CHECK:
+		#ifdef DEBUG
+		first = PINB & _BV(PB2);
+		delay(20); // should be enough anti-bouncing delay
+		second = PINB & _BV(PB2);
+		#else
+		first = PINB & _BV(PB0);
+		delay(20);
+		second = PINB & _BV(PB0);
+		#endif
+		if( (first + second) != 2 ) { // both measurements must read 1 (button released long enough)
+			goto BUTTON_CHECK;
+		} else {
+			// proceed
+		}
+
 	sei();
-	sleep_mode();
-	off_timer = ON_2H;
-	fade_in();
+	sleep_mode();	// now go to sleep
+	fade_in();	// wake up here again
 }
 
 // Interrupt signal PCINT0: On PB0 (PB2 for DEBUG, different board)
 ISR(PCINT0_vect)
 {
-	PCMSK = 0;
+	PCMSK = 0; // clear PCINT-mask to disable pin-change interrupt
 	GIFR |= _BV(PCIF); // clear PCIF
 }
 
@@ -161,20 +182,20 @@ ISR(PCINT0_vect)
 void flicker(void)
 {
 	uint32_t r;
-	uint8_t temp1;
-	uint8_t temp2;
+	uint8_t flicker_delay;
+	uint8_t flicker_brightness;
 
 	r = rand();
-	temp1 = (uint8_t) (r >> 28);
+	flicker_delay = (uint8_t)(r >> 28);
+	flicker_brightness = (uint8_t)(r); // user lowermost 8 bits to set values for the LED brightness
 
 	if (off_flag) {
 		set_brightness(0);
 	} else {
-		temp2 = (uint8_t) r;	// use lowermost 8 bits to set values for the LED pins
 		set_brightness(0);
-		_delay_loop_2(temp1 << 7);
-		set_brightness(temp2);
-		_delay_loop_2(temp1 << 7);
+		delay(flicker_delay);
+		set_brightness(flicker_brightness);
+		delay(flicker_delay);
 	}
 }
 
@@ -230,7 +251,6 @@ ISR(TIM0_COMPA_vect)
 		if (button_held_counter > 0) {	// button up detected
 			fast_flicker = !fast_flicker;
 		}
-
 		button_held_counter = 0;
 	} else {		// button is held
 		button_held_counter++;
