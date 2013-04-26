@@ -80,7 +80,7 @@
 
 // defines for on time (in seconds)
 #define ON_1H 3600
-#define ON_2H 15
+#define ON_2H 7200
 #define ON_3H 10800
 #define ON_4H 14400
 #define ON_5h 18000
@@ -192,9 +192,9 @@ void flicker(void)
 
 	flicker_brightness = (uint8_t)(r); // user lowermost 8 bits to set values for the LED brightness
 
-	set_brightness(0);
+	fade(brightness,0,1); //set_brightness(0);
 	delay(flicker_delay);
-	set_brightness(flicker_brightness);
+	fade(0,flicker_brightness,1); //set_brightness(flicker_brightness);
 	delay(flicker_delay);
 }
 
