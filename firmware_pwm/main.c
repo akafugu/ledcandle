@@ -98,10 +98,10 @@ int main(void)
 {
 	// Attiny13A fuse setting: -U lfuse:w:0x7A:m -U hfuse:w:0xFB:m
 	//
-	// set system-clock prescaler to 1/16
-	// 9.6MHz RC-oscillator --> 600kHz system-clock
+	// set system-clock prescaler to 1/8
+	// 4.8MHz RC-oscillator --> 600kHz system-clock
 	CLKPR = _BV(CLKPCE);
-	CLKPR = _BV(CLKPS2);
+	CLKPR = _BV(CLKPS1) | _BV(CLKPS0);
 
 	// configure TIMER0
 	TCCR0A = _BV(WGM01);	// set CTC mode
@@ -116,6 +116,9 @@ int main(void)
 	// set port directions
 	PORT_DIR_REG = PORT_DIR_MASK;
 	
+	// disable analog comparator to save power
+	ACSR = _BV(ACD);
+
 	// globally enable interrupts
 	// necessary to wake up from sleep via pin-change interrupt
 	sei();
@@ -245,7 +248,7 @@ ISR(TIM0_COMPA_vect)
 
 	// decrease system-clock
 	CLKPR = _BV(CLKPCE);
-	CLKPR = _BV(CLKPS2);	// set system-clock prescaler to 1/16 --> 9.6MHz / 16 = 600kHz
+	CLKPR = _BV(CLKPS1) | _BV(CLKPS0);	// set system-clock prescaler to 1/8 --> 4.8 MHz / 8 = 600kHz
 }
 
 void delay(uint16_t ms) {

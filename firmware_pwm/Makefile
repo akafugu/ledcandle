@@ -131,9 +131,12 @@ endif
 # Brown-out detection at 2.7V
 # (for 4.3V brown-put detection, change hfuse to hfuse:w:0xf9:m
 # 9.6MHz internal
-AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x7A:m -U hfuse:w:0xFB:m
+#AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x7A:m -U hfuse:w:0xFB:m
 
-# 4.6MHz internal / 8 = 575kHz
+# 4.8MHz internal
+AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x79:m -U hfuse:w:0xFB:m
+
+# 4.8MHz internal / 8 = 575kHz
 #AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x69:m -U hfuse:w:0xfb:m
 # 128kHz internal
 #AVRDUDE_WRITE_FUSE ?= -U lfuse:w:0x7b:m -U hfuse:w:0xfb:m
