@@ -198,6 +198,8 @@ ISR(TIM0_COMPA_vect)
 	CLKPR = _BV(CLKPCE);
 	CLKPR = 0;		// set system-clock prescaler to 1 --> full 9.6MHz
 
+	// Binary-weighted PWM generation - BEGIN
+
 	if ( brightness & bitmask ) {
 		PORT_OUT_REG |= LED_MASK;
 	} else {
@@ -216,6 +218,8 @@ ISR(TIM0_COMPA_vect)
 	OCR0A = OCR0A_next;	// when to run next time
 	TCNT0 = 0;		// clear timer to compensate for code runtime above
 	TIFR0 = _BV(OCF0A);	// clear interrupt flag to kill any erroneously pending interrupt in the queue
+
+	// PWM generation - END
 
 	if (PWM_cycle_counter == 293) {	// count seconds
 		sec_counter++;
