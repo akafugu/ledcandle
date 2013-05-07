@@ -150,7 +150,11 @@ void do_sleep(void)
 	// now we want to make sure the button is not pressed and is stable (not bouncing)
 	// switch bouncing is an unwanted wake-up source
 
-	PORT_OUT_REG |= LED_MASK;
+	#ifdef DEBUG
+		PORT_OUT_REG |= LED_MASK; // all ON - current source
+	#else
+		PORT_OUT_REG &= ~LED_MASK; // all ON - current sink
+	#endif
 
 	while( !(PORT_IN_REG & _BV(BUTTON_PIN)) ) { // while button is pressed (LOW)
 		delay(500);
@@ -203,10 +207,18 @@ ISR(TIM0_COMPA_vect)
 
 	// Binary-weighted PWM generation - BEGIN
 
-	if ( brightness & bitmask ) {
-		PORT_OUT_REG |= LED_MASK;
-	} else {
-		PORT_OUT_REG &= ~LED_MASK;
+	if ( brightness & bitmask ) { // turn ON
+		#ifdef DEBUG
+			PORT_OUT_REG |= LED_MASK; // source current
+		#else
+			PORT_OUT_REG &= ~LED_MASK; // sink current
+		#endif
+	} else { // turn OFF
+		#ifdef DEBUG
+			PORT_OUT_REG &= ~LED_MASK;
+		#else
+			PORT_OUT_REG |= LED_MASK;
+		#endif
 	}
 
 	OCR0A_next = bitmask;
