@@ -42,7 +42,7 @@
  *
  */
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 	#define PORT_DIR_REG DDRB
@@ -61,7 +61,7 @@
 	#define PORT_IN_REG PINB
 	#define BUTTON_PIN PB0
 	// LEDs sit on PB4...PB1
-	#define LED MASK 0b00011110
+	#define LED_MASK 0b00011110
 	// PB4...PB1 as output, rest input
 	#define PORT_DIR_MASK 0b00011110
 	// pin-change mask
