@@ -96,6 +96,7 @@ int main(void)
 	fade(0,255,1);
 
 	while (1) {
+		// the flag 'sleep_requested' is set in the ISR: TIM0_COMPA_vect
 		if(sleep_requested == 1) {
 			do_sleep();
 		}
@@ -114,7 +115,7 @@ uint32_t rand(void)
 // Enter sleep mode: Wake on INT0 interrupt
 void do_sleep(void)
 {
-	cli();
+	cli(); // turn all interrupts off, so we can be sure nothing gets disturbed here
 	sleep_requested = 0;
 
 	// now we want to make sure the button is not pressed and is stable (not bouncing)
@@ -135,8 +136,8 @@ void do_sleep(void)
 
 	sei();
 	fade(255,0,1); // fade OUT after the button was released
-	GIFR &= ~_BV(PCIF);
-	PCMSK = PINC_MASK; // 'remove the safety' on the pin-change interrupt
+	GIFR &= ~_BV(PCIF); // clear PC-interrupt flag - just to be safe
+	PCMSK = PINC_MASK; // 'remove the safety' on the pin-change interrupt at the last possible moment
 	sleep_cpu();
 	sleep_disable();
 	fade(0,255,1);	// wake up here again
@@ -169,7 +170,7 @@ ISR(TIM0_COMPA_vect)
 	uint8_t OCR0A_next;
 
 	// increase system-clock
-	CLKPR = _BV(CLKPCE);
+	CLKPR = _BV(CLKPCE);	// set CLocK Prescaler Change Enable bit
 	CLKPR = 0;		// set system-clock prescaler to 1 --> full 9.6MHz
 
 	// Binary-weighted PWM generation - BEGIN
@@ -226,13 +227,13 @@ ISR(TIM0_COMPA_vect)
 	}
 
 	// decrease system-clock
-	CLKPR = _BV(CLKPCE); // set 'CLock Prescaler Change Enable'
+	CLKPR = _BV(CLKPCE); // set 'CLocK Prescaler Change Enable'
 	CLKPR = _BV(CLKPS1) | _BV(CLKPS0);	// set system-clock prescaler to 1/8 --> 4.8 MHz / 8 = 600kHz
 }
 
 void delay(uint16_t ms) {
 	while(ms) {
-		_delay_ms(1);
+		_delay_ms(1); // this function must be called with a compile-time CONST, otherwise it pulls in float-math (huge)
 		ms--;
 	}
 }

@@ -9,6 +9,7 @@
 #define ON_5h 18000
 
 #ifdef DEBUG
+	// A different dev-board was used to develop the firmware
 	#define PORT_DIR_REG DDRB
 	#define PORT_OUT_REG PORTB
 	#define PORT_IN_REG PINB
@@ -20,6 +21,7 @@
 	// pin-change mask
 	#define PINC_MASK 0b00000100
 #else
+	// Values for the original Akafugu LED candle hardware
 	#define PORT_DIR_REG DDRB
 	#define PORT_OUT_REG PORTB
 	#define PORT_IN_REG PINB
@@ -32,6 +34,7 @@
 	#define PINC_MASK 0b00000001
 #endif
 
+// not used, but nice to have
 #define sbi(var, mask)   ((var) |= (uint8_t)(1 << mask))
 #define cbi(var, mask)   ((var) &= (uint8_t)~(1 << mask))
 
