@@ -119,6 +119,10 @@ int main(void)
 	// disable analog comparator to save power
 	ACSR = _BV(ACD);
 
+	// Pin change interrupt enabled
+	// The actual pin will be activated later
+	GIMSK |= _BV(PCIE);
+		
 	// globally enable interrupts
 	// necessary to wake up from sleep via pin-change interrupt
 	sei();
@@ -160,16 +164,13 @@ void do_sleep(void)
 		delay(500);
 	}
 
-	GIFR &= ~_BV(PCIF);
-
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	sleep_enable();
 
-	GIMSK |= _BV(PCIE);	// Pin change interrupt enabled
-	PCMSK = PINC_MASK;
-
 	sei();
 	fade(255,0,1);
+	GIFR &= ~_BV(PCIF);
+	PCMSK = PINC_MASK; // 'remove the safety' on the pin-change interrupt
 	sleep_cpu();
 	sleep_disable();
 	fade(0,255,1);	// wake up here again
