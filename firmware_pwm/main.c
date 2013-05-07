@@ -44,46 +44,12 @@
 
 //#define DEBUG
 
-#ifdef DEBUG
-	#define PORT_DIR_REG DDRB
-	#define PORT_OUT_REG PORTB
-	#define PORT_IN_REG PINB
-	#define BUTTON_PIN PB2
-	// LED sits on PB0
-	#define LED_MASK 0b00000001
-	// PB0 as output, rest input
-	#define PORT_DIR_MASK 0b00000001
-	// pin-change mask
-	#define PINC_MASK 0b00000100
-#else
-	#define PORT_DIR_REG DDRB
-	#define PORT_OUT_REG PORTB
-	#define PORT_IN_REG PINB
-	#define BUTTON_PIN PB0
-	// LEDs sit on PB4...PB1
-	#define LED_MASK 0b00011110
-	// PB4...PB1 as output, rest input
-	#define PORT_DIR_MASK 0b00011110
-	// pin-change mask
-	#define PINC_MASK 0b00000001
-#endif
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
 #include <util/delay.h>
 #include <stdbool.h>
 #include "main.h"
-
-#define sbi(var, mask)   ((var) |= (uint8_t)(1 << mask))
-#define cbi(var, mask)   ((var) &= (uint8_t)~(1 << mask))
-
-// defines for on time (in seconds)
-#define ON_1H 3600
-#define ON_2H 7200
-#define ON_3H 10800
-#define ON_4H 14400
-#define ON_5h 18000
 
 // how long to stay on
 uint16_t off_timer = ON_2H;
@@ -106,7 +72,7 @@ int main(void)
 	// configure TIMER0
 	TCCR0A = _BV(WGM01);	// set CTC mode
 	TCCR0B = ( _BV(CS01) );	// set prescaler to 8
-	// enable COMPA isr
+	// enable COMPA ISR
 	TIMSK0 = _BV(OCIE0A);
 	// set top value for TCNT0
 	OCR0A = 10;		// just some start value
@@ -168,7 +134,7 @@ void do_sleep(void)
 	sleep_enable();
 
 	sei();
-	fade(255,0,1);
+	fade(255,0,1); // fade OUT after the button was released
 	GIFR &= ~_BV(PCIF);
 	PCMSK = PINC_MASK; // 'remove the safety' on the pin-change interrupt
 	sleep_cpu();
@@ -188,10 +154,10 @@ void flicker(void)
 {
 	uint8_t flicker_brightness = (uint8_t)(rand()); // user lowermost 8 bits to set values for the LED brightness
 
-	fade(brightness,16, (uint8_t)(rand() >> 30) );
-	delay( (uint8_t)(rand() >> 24) );
-	fade(16,flicker_brightness, (uint8_t)(rand() >> 30) );
-	delay( (uint8_t)(rand() >> 24) );
+	fade(brightness,16, (uint8_t)(rand() >> 30) ); // fade from current brightness down to 16, random fade speed
+	delay( (uint8_t)(rand() >> 24) ); // random delay
+	fade(16,flicker_brightness, (uint8_t)(rand() >> 30) ); // fade from 16 to a random brightness, random fade speed
+	delay( (uint8_t)(rand() >> 24) ); // random delay
 }
 
 ISR(TIM0_COMPA_vect)
@@ -222,8 +188,8 @@ ISR(TIM0_COMPA_vect)
 		#endif
 	}
 
-	OCR0A_next = bitmask;
-	bitmask = bitmask << 1;
+	OCR0A_next = bitmask; // the bitmask determines when the ISR is called next - intervals: 1, 2, 4, 8, 16, 32, 64, 128
+	bitmask = bitmask << 1; // shift 1 bit to the left
 
 	if (bitmask == _BV(9)) {
 		bitmask = 0x0001;
@@ -260,7 +226,7 @@ ISR(TIM0_COMPA_vect)
 	}
 
 	// decrease system-clock
-	CLKPR = _BV(CLKPCE);
+	CLKPR = _BV(CLKPCE); // set 'CLock Prescaler Change Enable'
 	CLKPR = _BV(CLKPS1) | _BV(CLKPS0);	// set system-clock prescaler to 1/8 --> 4.8 MHz / 8 = 600kHz
 }
 
