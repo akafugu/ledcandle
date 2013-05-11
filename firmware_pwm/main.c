@@ -54,6 +54,9 @@
 // how long to stay on
 uint16_t off_timer = ON_2H;
 
+// minimum light-level
+#define MIN_BRIGHTNESS 16
+
 // random number seed (will give same flicker sequence each time)
 uint32_t lfsr = 0xbeefcace;
 
@@ -155,9 +158,9 @@ void flicker(void)
 {
 	uint8_t flicker_brightness = (uint8_t)(rand()); // user lowermost 8 bits to set values for the LED brightness
 
-	fade(brightness,16, (uint8_t)(rand() >> 30) ); // fade from current brightness down to 16, random fade speed
+	fade(brightness, MIN_BRIGHTNESS, (uint8_t)(rand() >> 30) ); // fade from current brightness down to MIN_BRIGHTNESS, random fade speed
 	delay( (uint8_t)(rand() >> 24) ); // random delay
-	fade(16,flicker_brightness, (uint8_t)(rand() >> 30) ); // fade from 16 to a random brightness, random fade speed
+	fade(MIN_BRIGHTNESS, flicker_brightness, (uint8_t)(rand() >> 30) ); // fade from MIN_BRIGHTNESS to a random brightness, random fade speed
 	delay( (uint8_t)(rand() >> 24) ); // random delay
 }
 
