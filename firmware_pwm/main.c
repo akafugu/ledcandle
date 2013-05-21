@@ -244,6 +244,8 @@ void delay(uint16_t ms) {
 void fade(uint8_t from, uint8_t to, uint8_t f_delay) {
 	uint8_t counter;
 
+	// I know the fade stops at (to-1).
+
 	if(from <= to) {
 		for(counter = from; counter < to; counter++) {
 			brightness = counter;
