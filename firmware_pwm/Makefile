@@ -11,7 +11,7 @@
 # PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 # Define your programmer in this file: ~/user.mk
--include ./user.mk
+-include ~/user.mk
 
 SILENT ?= @
 CROSS ?= avr-

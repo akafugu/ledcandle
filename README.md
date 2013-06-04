@@ -30,3 +30,6 @@ Plug in ISP programmer into the ISP header, and in the directory 'firmware', do:
 
 make fuse flash
 
+An alternative firmware is available in the directory firmware_pwm, courtesy of madworm.
+This firmware features a very different and slower flickering style.
+
